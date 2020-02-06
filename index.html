@@ -2,13 +2,248 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>CUSTOM ELEMENT NAME</title>
+    <title>Giphy selector</title>
+    <meta name="author" content="Maarten van den Hooven" />
+
+    <!-- libs -->
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.3.1/dist/jquery.min.js"></script>
+
     <!-- Kontent Styling -->
     <link rel="stylesheet" href="custom-element.css" />
     <!-- Kentico Custom elements API-->
     <script src="https://app.kontent.ai/js-api/custom-element/v1/custom-element.min.js"></script>
+
+    <!-- Custom elements styles -->
+    <style>
+      body {
+        margin: 0;
+      }
+
+      .disabled_overlay {
+        position: fixed;
+        z-index: 10;
+        cursor: not-allowed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+      }
+
+      div#GiphyImages img {
+        max-width: 100%;
+        height: auto;
+        margin: 5px;
+      }
+
+      div.gallery img {
+        cursor: pointer;
+      }
+
+      div.gallery {
+        margin: 5px;
+        border: 1px solid #ccc;
+        float: left;
+        width: 180px;
+      }
+
+      div.gallery:hover {
+        border: 1px solid #777;
+      }
+
+      div.title {
+        padding: 15px;
+        text-align: center;
+      }
+
+      div.error {
+        color: red;
+        font-style: italic;
+      }
+    </style>
   </head>
   <body>
     <!-- Custom element HTML -->
+    <div>
+      <div class="text-field">
+        <input
+          class="text-field__input"
+          id="search"
+          type="text"
+          placeholder="search text"
+          style="resize: none;"
+        />
+      </div>
+      <button
+        class="btn btn--primary"
+        data-balloon="Image"
+        data-balloon-pos="up-left"
+        id="submit"
+        style="margin: 10px;"
+        type="button"
+      >
+        <span>Search image on Giphy</span
+        ><i class="icon-autogenerate btn__endicon" aria-hidden="true"></i>
+      </button>
+      <button
+        class="btn btn--primary"
+        data-balloon="Image"
+        data-balloon-pos="up-left"
+        id="clear"
+        style="margin: 10px;"
+        type="button"
+      >
+        <span>Clear</span
+        ><i class="icon-clear-filter btn__endicon" aria-hidden="true"></i>
+      </button>
+      <div id="GiphyImages"></div>
+    </div>
+    <!-- Custom element code -->
+    <script>
+      var isDisabled = false;
+
+      function updateDisabled(disabled) {
+        isDisabled = disabled;
+
+        $("#search").attr("readonly", disabled);
+        $("#submit").attr("disabled", disabled);
+        $("#clear").attr("disabled", disabled);
+      }
+
+      function setupGiphyImageSelector(value, params) {
+        //Set trigger on enter key on the search field
+        const input = document.querySelector("#search");
+        input.addEventListener("keyup", function(event) {
+          if (event.keyCode === 13) {
+            event.preventDefault();
+            $("#submit").click();
+            updateSize();
+          }
+        });
+
+        //Load image of the current saved value
+        input.value = value;
+        $("#GiphyImages").html($("<img>").attr({ src: value }));
+
+        //Bind method to search on Giphy to the search button
+        $("#submit").on("click", function() {
+          searchGiphy(params);
+        });
+
+        //Bind method to reset
+        $("#clear").on("click", function() {
+          $("#GiphyImages").html("");
+          $("#search").val("");
+          CustomElement.setValue("");
+        });
+      }
+
+      function isEmpty(value) {
+        return value == null || value == "";
+      }
+
+      function searchGiphy(params) {
+        $("#GiphyImages").html("");
+
+        /*Get value for search */
+        params["q"] = $("#search").val();
+
+        /*Clean all empty parameters and generate querystring for api call*/
+        for (key in params) if (isEmpty(params[key])) delete params[key];
+        var queryString = $.param(params);
+
+        /*jQuery AJAX Method*/
+        var giphyAPI = `https://api.giphy.com/v1/gifs/search?${queryString}`;
+
+        $.getJSON(giphyAPI, function(data) {
+          try {
+            $.each(data.data, function(i, item) {
+              var giphyURL = item.images.fixed_height.url;
+              img = `<div class='gallery'><img class='giphyimg' src='${giphyURL}'/>`;
+              $(img).appendTo("#GiphyImages");
+            });
+          } catch (err) {
+            // Initialization with Kentico Custom element API failed (page displayed outside of the Kentico UI)
+            console.error(err);
+            $(
+              "<div class='error'><strong>Images cannot be loaded</strong><br/>Check if you're API key and secret are correct.</div>"
+            ).appendTo("#flickrImages");
+            updateSize();
+          }
+
+          updateSize();
+
+          $(".giphyimg").click(function(e) {
+            var fileName = $(e.target)
+              .closest("img")
+              .attr("src");
+            if (fileName) {
+              CustomElement.setValue(fileName);
+              $("#GiphyImages").html($("<img>").attr("src", fileName));
+              $("#search").val(fileName);
+            }
+            updateSize();
+          });
+        });
+      }
+
+      function updateSize() {
+        const height = Math.ceil($("html").height());
+        CustomElement.setHeight(height);
+
+        // No images loaded
+        var imagesLoaded = 0;
+        // Count the total number of images on the page when the page has loaded.
+        var totalImages = $("img").length;
+
+        // After an image is loaded, add to the count, and if that count equals the
+        // total number of images, resize now custom element
+        $("img").on("load", function(event) {
+          imagesLoaded++;
+          if (imagesLoaded == totalImages) {
+            const height = Math.ceil($("html").height());
+            CustomElement.setHeight(height);
+          }
+        });
+      }
+
+      function initCustomElement() {
+        try {
+          CustomElement.init((element, _context) => {
+            var params = {
+              api_key: "",
+              q: "",
+              limit: "",
+              offset: "",
+              rating: "",
+              lang: ""
+            };
+
+            if (element.config) {
+              if (element.config.apikey)
+                params["api_key"] = element.config.apikey;
+              if (element.config.limit) params["limit"] = element.config.limit;
+              if (element.config.offset)
+                params["offset"] = element.config.offset;
+              if (element.config.rating)
+                params["rating"] = element.config.rating;
+              if (element.config.lang) params["lang"] = element.config.lang;
+            }
+            // Setup with initial value and disabled state
+            updateDisabled(element.disabled);
+            setupGiphyImageSelector(element.value, params);
+            updateSize();
+          });
+          // React on disabled changed (e.g. when publishing the item)
+          CustomElement.onDisabledChanged(updateDisabled);
+        } catch (err) {
+          // Initialization with Kentico Custom element API failed (page displayed outside of the Kentico UI)
+          console.error(err);
+          updateDisabled(true);
+        }
+      }
+
+      initCustomElement();
+    </script>
   </body>
 </html>
