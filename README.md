@@ -1,5 +1,8 @@
 # Giphy Selector Custom Element for Kentico Kontent
 
+## :warning: Archival notice
+> This repository has been archived and is no longer maintained.
+
 This is a [custom element](https://docs.kontent.ai/tutorials/develop-apps/integrate/integrating-your-own-content-editing-features) for [Kentico Kontent](https://kontent.ai) that allows you to search Giphy and select one.
 
 ![Screenshot of custom element](GiphySelector.gif)
